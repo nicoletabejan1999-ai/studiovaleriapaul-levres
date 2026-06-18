@@ -835,7 +835,7 @@ src="https://www.facebook.com/tr?id=1406523847615532&ev=PageView&noscript=1"/></
          Branchez l'attribut action sur votre service (Formspree, Brevo, CRM, e-mail…)
          ou traitez l'événement 'submit' côté back-office. -->
     <div class="lead-form" id="leadForm">
-      <form action="#" method="post" novalidate>
+      <form action="/api/lead" method="post" novalidate>
         <div class="row">
           <div class="field">
             <label for="lf-nom">Nom &amp; prénom</label>
@@ -925,13 +925,20 @@ src="https://www.facebook.com/tr?id=1406523847615532&ev=PageView&noscript=1"/></
   });
 })();
 
-/* Formulaire de leads : validation + confirmation.
-   Remplacez le bloc 'TODO envoi' par votre appel (fetch vers Formspree/CRM/API). */
+/* Formulaire de leads : validation + envoi AJAX + confirmation sur place.
+   L'envoi passe par /api/lead (même origine) qui relaie au CRM via le webhook
+   défini en variable d'env Vercel (ZAPIER_WEBHOOK_URL) — le webhook n'est donc
+   PAS exposé dans la page. En cas de succès : remerciement + événement Meta Pixel "Lead". */
 (function(){
   var wrap=document.getElementById('leadForm');
   if(!wrap) return;
   var form=wrap.querySelector('form');
-  var HOOK='https://hooks.zapier.com/hooks/catch/18421979/43et2xu/';
+  var leadFired=false;
+  function thankYou(){
+    wrap.classList.add('sent');
+    if(!leadFired && window.fbq){fbq('track','Lead');leadFired=true;}
+    wrap.scrollIntoView({behavior:'smooth',block:'center'});
+  }
   form.addEventListener('submit',function(e){
     e.preventDefault();
     if(!form.checkValidity()){form.reportValidity();return;}
@@ -943,17 +950,23 @@ src="https://www.facebook.com/tr?id=1406523847615532&ev=PageView&noscript=1"/></
     data.append('source','Landing Page Lèvres');
     data.append('page',location.href);
     data.append('date',new Date().toISOString());
-    fetch(HOOK,{method:'POST',body:data})
-      .then(function(){
-        wrap.classList.add('sent');
-        if(window.fbq){fbq('track','Lead');}
-        wrap.scrollIntoView({behavior:'smooth',block:'center'});
+    fetch('/api/lead',{
+      method:'POST',
+      headers:{'X-Requested-With':'fetch','Content-Type':'application/x-www-form-urlencoded'},
+      body:data.toString()
+    })
+      .then(function(r){ return r.json().catch(function(){return {ok:r.ok};}); })
+      .then(function(res){
+        if(!res||!res.ok){throw new Error((res&&res.error)||'fail');}
+        thankYou();
       })
       .catch(function(){
         btn.disabled=false; btn.innerHTML=old;
         alert('Une erreur est survenue. Veuillez réessayer ou nous contacter par téléphone.');
       });
   });
+  /* Filet de sécurité : retour de l'envoi natif (sans JS) via ?envoi=ok */
+  if(/[?&]envoi=ok\b/.test(location.search)){ thankYou(); }
 })();
 
 /* Galerie : lightbox interactif (clic, flèches, Échap, swipe) */
