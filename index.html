@@ -444,6 +444,31 @@ src="https://www.facebook.com/tr?id=1406523847615532&ev=PageView&noscript=1"/></
     .grid-4,.grid-3,.gal-grid,.badges,.avis-grid,.options,.infos{grid-template-columns:1fr}
     .nav__cta{display:none}
   }
+
+  /* Bandeau cookies (informatif) */
+  .cookie-banner{
+    position:fixed;left:50%;bottom:20px;transform:translate(-50%,16px);z-index:200;
+    width:min(720px,calc(100% - 32px));display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px;
+    padding:18px 22px;background:#fff;border:1px solid var(--bord);border-radius:18px;
+    box-shadow:0 24px 60px rgba(21,17,14,.16);opacity:0;visibility:hidden;
+    transition:opacity .35s ease,transform .35s ease,visibility .35s;
+  }
+  .cookie-banner.is-visible{opacity:1;visibility:visible;transform:translate(-50%,0)}
+  .cookie-banner__text{flex:1 1 280px;margin:0;font-size:.88rem;line-height:1.55;color:var(--gris)}
+  .cookie-banner__actions{display:flex;gap:10px;margin-left:auto}
+  .cookie-banner__btn{
+    font-size:.82rem;font-weight:600;padding:10px 22px;border-radius:40px;cursor:pointer;
+    border:1px solid var(--bord);background:transparent;color:var(--noir);
+    transition:background .2s ease,color .2s ease,transform .2s ease;
+  }
+  .cookie-banner__btn--ghost:hover{background:var(--nude)}
+  .cookie-banner__btn--accept{background:var(--noir);color:#fff;border-color:var(--noir)}
+  .cookie-banner__btn--accept:hover{background:var(--terracotta);border-color:var(--terracotta);transform:translateY(-1px)}
+  @media (max-width:520px){
+    .cookie-banner{bottom:0;width:100%;border-radius:18px 18px 0 0}
+    .cookie-banner__actions{width:100%}
+    .cookie-banner__btn{flex:1}
+  }
 </style>
 </head>
 <body>
@@ -1099,7 +1124,42 @@ src="https://www.facebook.com/tr?id=1406523847615532&ev=PageView&noscript=1"/></
   range.addEventListener('input',apply);
   apply();
 })();
+
+/* Bandeau cookies (informatif) : se masque au clic et mémorise le choix
+   (localStorage) pour ne plus réapparaître. Aucune gestion réelle de cookies.
+   Ce script s'exécute avant que le bandeau ne soit dans le DOM (placé plus bas),
+   on attend donc DOMContentLoaded. */
+(function(){
+  function initCookieBanner(){
+    var banner=document.getElementById('cookieBanner');
+    if(!banner) return;
+    try{ if(localStorage.getItem('cookieConsent')) return; }catch(e){}
+    banner.hidden=false;
+    requestAnimationFrame(function(){ banner.classList.add('is-visible'); });
+    banner.querySelectorAll('[data-cookie]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        try{ localStorage.setItem('cookieConsent',btn.getAttribute('data-cookie')); }catch(e){}
+        banner.classList.remove('is-visible');
+        setTimeout(function(){ banner.hidden=true; },350);
+      });
+    });
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',initCookieBanner); }
+  else { initCookieBanner(); }
+})();
 </script>
+
+<!-- Bandeau cookies (informatif) -->
+<div class="cookie-banner" id="cookieBanner" role="dialog" aria-live="polite" aria-label="Information cookies" hidden>
+  <p class="cookie-banner__text">
+    Nous utilisons des cookies pour améliorer votre expérience et mesurer notre audience.
+    En poursuivant votre navigation, vous acceptez leur utilisation.
+  </p>
+  <div class="cookie-banner__actions">
+    <button type="button" class="cookie-banner__btn cookie-banner__btn--ghost" data-cookie="refuse">Refuser</button>
+    <button type="button" class="cookie-banner__btn cookie-banner__btn--accept" data-cookie="accept">Accepter</button>
+  </div>
+</div>
 
 </body>
 </html>
