@@ -463,6 +463,11 @@ src="https://www.facebook.com/tr?id=1406523847615532&ev=PageView&noscript=1"/></
     .cookie-banner__actions{width:100%}
     .cookie-banner__btn{flex:1}
   }
+
+  /* Lenis smooth scroll */
+  html.lenis, html.lenis body { height: auto; }
+  .lenis.lenis-smooth { scroll-behavior: auto !important; }
+  .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
 </style>
 </head>
 <body>
@@ -1239,6 +1244,519 @@ src="https://www.facebook.com/tr?id=1406523847615532&ev=PageView&noscript=1"/></
     <button type="button" class="cookie-banner__btn cookie-banner__btn--accept" data-cookie="accept">Accepter</button>
   </div>
 </div>
+
+<!-- Lenis + GSAP ScrollTrigger -->
+<script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js"></script>
+<script src="https://unpkg.com/gsap@3.12.7/dist/gsap.min.js"></script>
+<script src="https://unpkg.com/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
+<script>
+(function(){
+  /* ── Respect prefers-reduced-motion ── */
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  /* ── Lenis smooth scroll ── */
+  var lenis = new Lenis({
+    duration: 1.2,
+    easing: function(t){ return Math.min(1, 1.001 - Math.pow(2, -10 * t)); },
+    smooth: true
+  });
+  function raf(time){ lenis.raf(time); requestAnimationFrame(raf); }
+  requestAnimationFrame(raf);
+  gsap.ticker.add(function(time){ lenis.raf(time * 1000); });
+  gsap.ticker.lagSmoothing(0);
+
+  /* ── Register ScrollTrigger ── */
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* ── Helper: split text into word spans ── */
+  function splitWords(el){
+    var text = el.textContent;
+    var words = text.split(/\s+/);
+    el.innerHTML = '';
+    words.forEach(function(w, i){
+      var outer = document.createElement('span');
+      outer.style.display = 'inline-block';
+      outer.style.overflow = 'hidden';
+      outer.style.verticalAlign = 'top';
+      var inner = document.createElement('span');
+      inner.style.display = 'inline-block';
+      inner.textContent = w;
+      inner.className = 'split-word';
+      outer.appendChild(inner);
+      el.appendChild(outer);
+      if(i < words.length - 1){
+        el.appendChild(document.createTextNode(' '));
+      }
+    });
+    return el.querySelectorAll('.split-word');
+  }
+
+  /* ── Default ScrollTrigger config ── */
+  var stDefaults = { start: 'top 80%', once: true };
+
+  /* ============================
+     1. HERO (on page load)
+     ============================ */
+  var heroTl = gsap.timeline({ delay: 0.2 });
+
+  // h1: word split animation
+  var h1 = document.querySelector('.hero h1');
+  if(h1){
+    var wordEls = splitWords(h1);
+    gsap.set(wordEls, { y: '110%' });
+    heroTl.to(wordEls, {
+      y: '0%', duration: 1.2, ease: 'power4.out',
+      stagger: 0.08, force3D: true
+    }, 0);
+  }
+
+  // Eyebrow: clipPath reveal from left
+  var eyebrowD = document.querySelector('.hero__eyebrow-d');
+  var eyebrowM = document.querySelector('.hero__eyebrow-m');
+  [eyebrowD, eyebrowM].forEach(function(eb){
+    if(!eb) return;
+    gsap.set(eb, { clipPath: 'inset(0 100% 0 0)' });
+    heroTl.to(eb, {
+      clipPath: 'inset(0 0% 0 0)', duration: 0.9, ease: 'power3.out', force3D: true
+    }, 0.3);
+  });
+
+  // Sub text: fade up
+  var subP = document.querySelector('.hero p.sub');
+  var subInline = document.querySelector('.hero p[style*="clamp"]');
+  [subInline, subP].forEach(function(el){
+    if(!el) return;
+    gsap.set(el, { y: 30, opacity: 0 });
+    heroTl.to(el, {
+      y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true
+    }, 0.6);
+  });
+
+  // CTAs: scale from 0.85 + fade, staggered
+  var ctas = document.querySelectorAll('.hero .cta');
+  if(ctas.length){
+    gsap.set(ctas, { scale: 0.85, opacity: 0 });
+    heroTl.to(ctas, {
+      scale: 1, opacity: 1, duration: 0.8, ease: 'back.out(1.4)',
+      stagger: 0.12, force3D: true
+    }, 0.8);
+  }
+
+  // Hero image: subtle scale from 1.05 to 1 with fade
+  var heroPhoto = document.querySelector('.hero__photo');
+  if(heroPhoto){
+    gsap.set(heroPhoto, { scale: 1.05, opacity: 0 });
+    heroTl.to(heroPhoto, {
+      scale: 1, opacity: 1, duration: 1.4, ease: 'power2.out', force3D: true
+    }, 0.2);
+  }
+
+  // Rating: slide up with stagger
+  var ratingEls = document.querySelectorAll('.hero__rating > *');
+  if(ratingEls.length){
+    gsap.set(ratingEls, { y: 20, opacity: 0 });
+    heroTl.to(ratingEls, {
+      y: 0, opacity: 1, duration: 0.7, ease: 'power3.out',
+      stagger: 0.1, force3D: true
+    }, 1.0);
+  }
+
+  /* ============================
+     2. HERO FORM (dark, scroll-triggered)
+     ============================ */
+  var heroFormSection = document.querySelector('.hero-form-section');
+  if(heroFormSection){
+    var hfTitle = heroFormSection.querySelector('h2');
+    var hfFields = heroFormSection.querySelectorAll('.field');
+    var hfBtn = heroFormSection.querySelector('button[type="submit"]');
+
+    if(hfTitle){
+      gsap.set(hfTitle, { y: 60, opacity: 0 });
+      gsap.to(hfTitle, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: heroFormSection }, stDefaults)
+      });
+    }
+    if(hfFields.length){
+      gsap.set(hfFields, { y: 40, opacity: 0 });
+      gsap.to(hfFields, {
+        y: 0, opacity: 1, duration: 0.7, ease: 'power3.out',
+        stagger: 0.12, force3D: true,
+        scrollTrigger: Object.assign({ trigger: heroFormSection }, stDefaults)
+      });
+    }
+    if(hfBtn){
+      gsap.set(hfBtn, { scale: 0.9, opacity: 0 });
+      gsap.to(hfBtn, {
+        scale: 1, opacity: 1, duration: 0.7, ease: 'back.out(1.4)',
+        delay: 0.5, force3D: true,
+        scrollTrigger: Object.assign({ trigger: heroFormSection }, stDefaults)
+      });
+    }
+  }
+
+  /* ============================
+     3. CONTRARIAN (.autorite) — curtains opening
+     ============================ */
+  var autorite = document.querySelector('.autorite');
+  if(autorite){
+    var autHead = autorite.querySelector('.section-head');
+    var probCard = autorite.querySelector('.vs-card--prob');
+    var solCard = autorite.querySelector('.vs-card--sol');
+
+    if(autHead){
+      gsap.set(autHead, { y: 40, opacity: 0 });
+      gsap.to(autHead, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: autorite }, stDefaults)
+      });
+    }
+    if(probCard){
+      gsap.set(probCard, { x: -80, opacity: 0 });
+      gsap.to(probCard, {
+        x: 0, opacity: 1, duration: 1, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: autorite, start: 'top 75%' }, { once: true })
+      });
+    }
+    if(solCard){
+      gsap.set(solCard, { x: 80, opacity: 0 });
+      gsap.to(solCard, {
+        x: 0, opacity: 1, duration: 1, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: autorite, start: 'top 75%' }, { once: true })
+      });
+    }
+  }
+
+  /* ============================
+     4. GALLERY (.galerie) — scale + cascade
+     ============================ */
+  var galerie = document.querySelector('.galerie');
+  if(galerie){
+    var galHead = galerie.querySelector('.section-head');
+    var ba = document.getElementById('ba');
+    var mPhotos = galerie.querySelectorAll('.mphoto');
+
+    if(galHead){
+      gsap.set(galHead, { y: 40, opacity: 0 });
+      gsap.to(galHead, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: galerie }, stDefaults)
+      });
+    }
+    if(ba){
+      gsap.set(ba, { scale: 0.8, rotation: -2, opacity: 0 });
+      gsap.to(ba, {
+        scale: 1, rotation: 0, opacity: 1, duration: 1.2, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: ba }, stDefaults)
+      });
+    }
+    if(mPhotos.length){
+      gsap.set(mPhotos, { y: 50, scale: 0.9, opacity: 0 });
+      gsap.to(mPhotos, {
+        y: 0, scale: 1, opacity: 1, duration: 0.8, ease: 'power3.out',
+        stagger: 0.08, force3D: true,
+        scrollTrigger: Object.assign({ trigger: '.mgal' }, stDefaults)
+      });
+    }
+  }
+
+  /* ============================
+     5. BENEFITS (#benefices) — slide from left
+     ============================ */
+  var benefices = document.getElementById('benefices');
+  if(benefices){
+    var benHead = benefices.querySelector('.section-head');
+    var fascinations = benefices.querySelectorAll('p[style*="1.08rem"]');
+
+    if(benHead){
+      gsap.set(benHead, { y: 40, opacity: 0 });
+      gsap.to(benHead, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: benefices }, stDefaults)
+      });
+    }
+    if(fascinations.length){
+      gsap.set(fascinations, { x: -60, opacity: 0 });
+      gsap.to(fascinations, {
+        x: 0, opacity: 1, duration: 0.8, ease: 'power3.out',
+        stagger: 0.15, force3D: true,
+        scrollTrigger: Object.assign({ trigger: benefices, start: 'top 75%' }, { once: true })
+      });
+    }
+  }
+
+  /* ============================
+     6. TESTIMONIALS (.avis-band) — counter + phone + cards
+     ============================ */
+  var avisBand = document.querySelector('.avis-band');
+  if(avisBand){
+    // Rating counter animation 0 -> 4,9
+    var bigNum = avisBand.querySelector('.rating-summary .big');
+    if(bigNum){
+      var originalHTML = bigNum.innerHTML;
+      var counter = { val: 0 };
+      gsap.to(counter, {
+        val: 4.9, duration: 2, ease: 'power2.out',
+        scrollTrigger: Object.assign({ trigger: avisBand }, stDefaults),
+        onUpdate: function(){
+          bigNum.innerHTML = counter.val.toFixed(1).replace('.',',') + '<span style="font-size:1.4rem;color:#999">/5</span>';
+        }
+      });
+    }
+
+    // Video phone: slides up like being pulled from a pocket
+    var phone = avisBand.querySelector('.phone');
+    if(phone){
+      gsap.set(phone, { y: 100, opacity: 0, rotation: 5 });
+      gsap.to(phone, {
+        y: 0, opacity: 1, rotation: 0, duration: 1.1, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: '.video-temoignage' }, stDefaults)
+      });
+    }
+
+    // vt-text: fade up
+    var vtText = avisBand.querySelector('.vt-text');
+    if(vtText){
+      gsap.set(vtText, { y: 40, opacity: 0 });
+      gsap.to(vtText, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: '.video-temoignage' }, stDefaults)
+      });
+    }
+
+    // Review cards: slide in from right like a deck
+    var avisCards = avisBand.querySelectorAll('.avis-scroll .avis');
+    if(avisCards.length){
+      gsap.set(avisCards, { x: 60, opacity: 0 });
+      gsap.to(avisCards, {
+        x: 0, opacity: 1, duration: 0.7, ease: 'power3.out',
+        stagger: 0.1, force3D: true,
+        scrollTrigger: Object.assign({ trigger: '.avis-scroll' }, stDefaults)
+      });
+    }
+  }
+
+  /* ============================
+     7. PROCEDURE — parallax image + steps slide in
+     ============================ */
+  var procedure = document.querySelector('.procedure');
+  if(procedure){
+    // Image: parallax scrub
+    var procImg = procedure.querySelector('.proc-img img');
+    if(procImg){
+      gsap.set(procImg, { y: -60 });
+      gsap.to(procImg, {
+        y: 60, ease: 'none', force3D: true,
+        scrollTrigger: {
+          trigger: procedure,
+          start: 'top bottom',
+          end: 'bottom top',
+          scrub: true
+        }
+      });
+    }
+
+    // Steps: slide in from left
+    var steps = procedure.querySelectorAll('.step');
+    if(steps.length){
+      gsap.set(steps, { x: -50, opacity: 0 });
+      gsap.to(steps, {
+        x: 0, opacity: 1, duration: 0.8, ease: 'power3.out',
+        stagger: 0.15, force3D: true,
+        scrollTrigger: Object.assign({ trigger: procedure }, stDefaults)
+      });
+    }
+
+    // Info cards: stagger up
+    var infos = procedure.querySelectorAll('.info');
+    if(infos.length){
+      gsap.set(infos, { y: 40, opacity: 0 });
+      gsap.to(infos, {
+        y: 0, opacity: 1, duration: 0.7, ease: 'power3.out',
+        stagger: 0.1, force3D: true,
+        scrollTrigger: Object.assign({ trigger: '.infos' }, stDefaults)
+      });
+    }
+  }
+
+  /* ============================
+     8. BOOKING/PRICE (.prix) — dramatic price + trust list + form
+     ============================ */
+  var prix = document.querySelector('.prix');
+  if(prix){
+    // Price: scale from 1.3 to 1.0 — dramatic
+    var montant = prix.querySelector('.montant');
+    if(montant){
+      gsap.set(montant, { scale: 1.3, opacity: 0 });
+      gsap.to(montant, {
+        scale: 1, opacity: 1, duration: 1, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: prix }, stDefaults)
+      });
+    }
+
+    // Trust list items: stagger from right
+    var trustItems = prix.querySelectorAll('div[style*="max-width:540px"] p');
+    if(trustItems.length){
+      gsap.set(trustItems, { x: 40, opacity: 0 });
+      gsap.to(trustItems, {
+        x: 0, opacity: 1, duration: 0.6, ease: 'power3.out',
+        stagger: 0.08, force3D: true,
+        scrollTrigger: Object.assign({ trigger: prix, start: 'top 70%' }, { once: true })
+      });
+    }
+
+    // Form fields: stagger up
+    var prixFields = prix.querySelectorAll('#leadForm .field');
+    if(prixFields.length){
+      gsap.set(prixFields, { y: 30, opacity: 0 });
+      gsap.to(prixFields, {
+        y: 0, opacity: 1, duration: 0.6, ease: 'power3.out',
+        stagger: 0.1, force3D: true,
+        scrollTrigger: Object.assign({ trigger: '#leadForm' }, stDefaults)
+      });
+    }
+  }
+
+  /* ============================
+     9. SERVICE (#service) — 3D tilt entry
+     ============================ */
+  var service = document.getElementById('service');
+  if(service){
+    var svcHead = service.querySelector('.section-head');
+    var options = service.querySelectorAll('.option');
+
+    if(svcHead){
+      gsap.set(svcHead, { y: 40, opacity: 0 });
+      gsap.to(svcHead, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: service }, stDefaults)
+      });
+    }
+    if(options.length){
+      gsap.set(options, { rotationY: 8, y: 60, opacity: 0, scale: 0.95, transformPerspective: 1200 });
+      gsap.to(options, {
+        rotationY: 0, y: 0, opacity: 1, scale: 1, duration: 1, ease: 'power3.out',
+        stagger: 0.2, force3D: true,
+        scrollTrigger: Object.assign({ trigger: '.options' }, stDefaults)
+      });
+    }
+  }
+
+  /* ============================
+     10. LIP CONFIGURATOR (.lipconf-band) — pop in
+     ============================ */
+  var lipconf = document.querySelector('.lipconf-band');
+  if(lipconf){
+    var lcHead = lipconf.querySelector('.section-head');
+    var lcStage = lipconf.querySelector('.lipconf__stage');
+    var lcCtrl = lipconf.querySelector('.lipconf__ctrl');
+
+    if(lcHead){
+      gsap.set(lcHead, { y: 40, opacity: 0 });
+      gsap.to(lcHead, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: lipconf }, stDefaults)
+      });
+    }
+    if(lcStage){
+      gsap.set(lcStage, { scale: 0.7, opacity: 0 });
+      gsap.to(lcStage, {
+        scale: 1, opacity: 1, duration: 1, ease: 'back.out(1.7)', force3D: true,
+        scrollTrigger: Object.assign({ trigger: lipconf, start: 'top 75%' }, { once: true })
+      });
+    }
+    if(lcCtrl){
+      gsap.set(lcCtrl, { x: 40, opacity: 0 });
+      gsap.to(lcCtrl, {
+        x: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: lipconf, start: 'top 75%' }, { once: true })
+      });
+    }
+  }
+
+  /* ============================
+     11. TRUST (.trust) — stamps being placed
+     ============================ */
+  var trust = document.querySelector('.trust');
+  if(trust){
+    var trustHead = trust.querySelector('.section-head');
+    var badges = trust.querySelectorAll('.tb');
+
+    if(trustHead){
+      gsap.set(trustHead, { y: 40, opacity: 0 });
+      gsap.to(trustHead, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: trust }, stDefaults)
+      });
+    }
+    if(badges.length){
+      gsap.set(badges, { scale: 0, opacity: 0 });
+      gsap.to(badges, {
+        scale: 1, opacity: 1, duration: 0.7, ease: 'back.out(1.7)',
+        stagger: 0.12, force3D: true,
+        scrollTrigger: Object.assign({ trigger: '.badges' }, stDefaults)
+      });
+    }
+  }
+
+  /* ============================
+     12. FAQ (#faq) — drop from above with bounce
+     ============================ */
+  var faq = document.getElementById('faq');
+  if(faq){
+    var faqHead = faq.querySelector('.section-head');
+    var faqDetails = faq.querySelectorAll('details');
+
+    if(faqHead){
+      gsap.set(faqHead, { y: 40, opacity: 0 });
+      gsap.to(faqHead, {
+        y: 0, opacity: 1, duration: 0.9, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: faq }, stDefaults)
+      });
+    }
+    if(faqDetails.length){
+      gsap.set(faqDetails, { y: -30, opacity: 0 });
+      gsap.to(faqDetails, {
+        y: 0, opacity: 1, duration: 0.7, ease: 'back.out(1.4)',
+        stagger: 0.1, force3D: true,
+        scrollTrigger: Object.assign({ trigger: '.faq-wrap' }, stDefaults)
+      });
+    }
+  }
+
+  /* ============================
+     13. FINAL CTA — scale settle + pulse
+     ============================ */
+  var finalCTA = document.querySelector('section[style*="text-align:center"][style*="background:var(--noir)"]');
+  if(finalCTA && !finalCTA.classList.contains('prix') && !finalCTA.classList.contains('hero-form-section')){
+    var finalH2 = finalCTA.querySelector('h2');
+    var finalBtn = finalCTA.querySelector('.cta');
+
+    if(finalH2){
+      gsap.set(finalH2, { scale: 1.15, opacity: 0 });
+      gsap.to(finalH2, {
+        scale: 1, opacity: 1, duration: 1, ease: 'power3.out', force3D: true,
+        scrollTrigger: Object.assign({ trigger: finalCTA }, stDefaults)
+      });
+    }
+    if(finalBtn){
+      gsap.set(finalBtn, { y: 30, opacity: 0 });
+      gsap.to(finalBtn, {
+        y: 0, opacity: 1, duration: 0.8, ease: 'power3.out', force3D: true,
+        delay: 0.3,
+        scrollTrigger: Object.assign({ trigger: finalCTA }, stDefaults),
+        onComplete: function(){
+          gsap.to(finalBtn, {
+            scale: 1.05, duration: 0.6, ease: 'power1.inOut',
+            yoyo: true, repeat: 1, force3D: true
+          });
+        }
+      });
+    }
+  }
+
+})();
+</script>
 
 <script>
 document.addEventListener('click', function(e) {
